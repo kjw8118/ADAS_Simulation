@@ -62,17 +62,17 @@ class LiDAR(Entity):
     def __init__(self, **kwargs):
         super().__init__(model='cube', origin_y=-0.5, color=color.light_gray, **kwargs)
 
-        #self.minimap = Minimap(position=window.top_left)
+        self.minimap = Minimap(position=window.top_left)
         #self.minimap2 = Minimap(position=window.top_right)
 
     def update(self):
         pcd_points = []
-
+        pcd_points_plane = []
         world_rot_y = self.world_rotation_y
-        for theta in np.arange(-6, 6, 2):
+        for theta in np.arange(-4, 2, 2):
         #if True:
             #theta = 0
-            for phi in np.arange(0, 360, 0.4):
+            for phi in np.arange(0, 360, 0.4*2.5):
 
                 direction = Vec3(math.cos((phi + world_rot_y) / 180 * math.pi),
                                  math.sin(theta / 180 * math.pi),
@@ -84,13 +84,16 @@ class LiDAR(Entity):
                     y = hit.distance * math.sin(phi / 180 * math.pi)
                     z = hit.distance * math.sin(theta / 180 * math.pi)
                     pcd_points.append([x, y, z])
+                    if theta == 0:
+                        pcd_points_plane.append([x, y, z])
 
         self.points = pcd_points
         pcd = pcl.PointCloud(pcd_points)
         vox = pcd.make_voxel_grid_filter()
-        leaf_size = 1
+        leaf_size = 0.25
         vox.set_leaf_size(leaf_size, leaf_size, leaf_size)
         vox_grid = vox.filter()
+
         self.cloud.clear_points()
         for pcd_point in vox_grid.to_array():
             x = self.world_x + pcd_point[0]*math.cos(world_rot_y / 180 * math.pi) - pcd_point[1]*math.sin(world_rot_y/ 180 * math.pi)
@@ -102,8 +105,8 @@ class LiDAR(Entity):
         # Draw minimap
         #self.minimap2.clear_minimap()
         #self.minimap2.draw_pcd(cloud.to_array())
-        #self.minimap.clear_minimap()
-        #self.minimap.draw_pcd(self.points)
+        self.minimap.clear_minimap()
+        self.minimap.draw_pcd(pcd_points_plane)
 
 
 
@@ -114,7 +117,7 @@ if __name__ == "__main__":
     #app = Ursina(position=(2000, 500))
     app = Ursina()
 
-    window.size = (800, 600)
+    window.size = (1024, 768)
 
     random.seed(0)
     Entity.default_shader = lit_with_shadows_shader
