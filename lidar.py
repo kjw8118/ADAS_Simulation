@@ -3,7 +3,7 @@ from PIL import Image
 import numpy as np
 # import cv2
 # import open3d as o3d
-import pcl
+#import pcl
 
 import math
 import csv
@@ -16,7 +16,7 @@ class Cloud:
         pass
 
     def put_point(self, position, direction):
-        self.points.append(Entity(model='sphere', scale=0.1, color=color.red, position=position))
+        self.points.append(Entity(model='sphere', scale=0.05, color=color.red, position=position))
 
     def clear_points(self):
         for point in self.points:
@@ -62,21 +62,22 @@ class LiDAR(Entity):
     def __init__(self, **kwargs):
         super().__init__(model='cube', origin_y=-0.5, color=color.light_gray, **kwargs)
 
-        self.minimap = Minimap(position=window.top_left)
-        self.minimap2 = Minimap(position=window.top_right)
+        #self.minimap = Minimap(position=window.top_left)
+        #self.minimap2 = Minimap(position=window.top_right)
 
     def update(self):
         pcd_points = []
+
         world_rot_y = self.world_rotation_y
-        # for theta in np.arange(-15, 15, 2):
-        if True:
-            theta = 0
-            for phi in np.arange(0, 360, 0.4):
+        for theta in np.arange(-4, 4, 2):
+        #if True:
+            #theta = 0
+            for phi in np.arange(0, 360, 0.4*5):
 
                 direction = Vec3(math.cos((phi + world_rot_y) / 180 * math.pi),
                                  math.sin(theta / 180 * math.pi),
                                  math.sin((phi + world_rot_y) / 180 * math.pi))
-                hit = raycast(self.world_position, direction, ignore=(self, self.parent), distance=50, debug=False)
+                hit = raycast(self.world_position + (0, 0.5, 0), direction, ignore=(self, self.parent), distance=50, debug=False)
 
                 if hit.hit:
                     x = hit.distance * math.cos(phi / 180 * math.pi)
@@ -85,24 +86,24 @@ class LiDAR(Entity):
                     pcd_points.append([x, y, z])
 
         self.points = pcd_points
-        pcd = pcl.PointCloud(pcd_points)
-        vox = pcd.make_voxel_grid_filter()
-        leaf_size = 2
-        vox.set_leaf_size(leaf_size, leaf_size, leaf_size)
-        cloud = vox.filter()
+        #pcd = pcl.PointCloud(pcd_points)
+        #vox = pcd.make_voxel_grid_filter()
+        #leaf_size = 2
+        #vox.set_leaf_size(leaf_size, leaf_size, leaf_size)
+        #cloud = vox.filter()
         self.cld.clear_points()
-        for pcd_point in cloud.to_array():
+        for pcd_point in pcd_points:#cloud.to_array():
             x = self.world_x + pcd_point[0]*math.cos(world_rot_y / 180 * math.pi) - pcd_point[1]*math.sin(world_rot_y/ 180 * math.pi)
-            y = self.world_y
+            y = self.world_y + 0.5 + pcd_point[2]
             z = self.world_z + pcd_point[0]*math.sin(world_rot_y / 180 * math.pi) + pcd_point[1]*math.cos(world_rot_y/ 180 * math.pi)
             self.cld.put_point((x, y, z), [0, world_rot_y, 0])
 
 
         # Draw minimap
-        self.minimap2.clear_minimap()
-        self.minimap2.draw_pcd(cloud.to_array())
-        self.minimap.clear_minimap()
-        self.minimap.draw_pcd(self.points)
+        #self.minimap2.clear_minimap()
+        #self.minimap2.draw_pcd(cloud.to_array())
+        #self.minimap.clear_minimap()
+        #self.minimap.draw_pcd(self.points)
 
 
 
@@ -110,7 +111,8 @@ if __name__ == "__main__":
     from ursina.shaders import lit_with_shadows_shader
     from ursina.prefabs.first_person_controller import FirstPersonController
 
-    app = Ursina(position=(2000, 500))
+    #app = Ursina(position=(2000, 500))
+    app = Ursina()
 
     window.size = (800, 600)
 
