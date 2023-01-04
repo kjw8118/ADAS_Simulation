@@ -3,7 +3,7 @@ from PIL import Image
 import numpy as np
 # import cv2
 # import open3d as o3d
-#import pcl
+import pcl
 
 import math
 import csv
@@ -57,7 +57,7 @@ class LiDAR(Entity):
     resolution = 2
     # pc = pcl.PointCloud()
     points = []
-    cld = Cloud()
+    cloud = Cloud()
     #cntr = Entity(model='sphere', scale=0.1, color=color.red)
     def __init__(self, **kwargs):
         super().__init__(model='cube', origin_y=-0.5, color=color.light_gray, **kwargs)
@@ -69,10 +69,10 @@ class LiDAR(Entity):
         pcd_points = []
 
         world_rot_y = self.world_rotation_y
-        for theta in np.arange(-4, 4, 2):
+        for theta in np.arange(-6, 6, 2):
         #if True:
             #theta = 0
-            for phi in np.arange(0, 360, 0.4*5):
+            for phi in np.arange(0, 360, 0.4):
 
                 direction = Vec3(math.cos((phi + world_rot_y) / 180 * math.pi),
                                  math.sin(theta / 180 * math.pi),
@@ -86,17 +86,17 @@ class LiDAR(Entity):
                     pcd_points.append([x, y, z])
 
         self.points = pcd_points
-        #pcd = pcl.PointCloud(pcd_points)
-        #vox = pcd.make_voxel_grid_filter()
-        #leaf_size = 2
-        #vox.set_leaf_size(leaf_size, leaf_size, leaf_size)
-        #cloud = vox.filter()
-        self.cld.clear_points()
-        for pcd_point in pcd_points:#cloud.to_array():
+        pcd = pcl.PointCloud(pcd_points)
+        vox = pcd.make_voxel_grid_filter()
+        leaf_size = 1
+        vox.set_leaf_size(leaf_size, leaf_size, leaf_size)
+        vox_grid = vox.filter()
+        self.cloud.clear_points()
+        for pcd_point in vox_grid.to_array():
             x = self.world_x + pcd_point[0]*math.cos(world_rot_y / 180 * math.pi) - pcd_point[1]*math.sin(world_rot_y/ 180 * math.pi)
             y = self.world_y + 0.5 + pcd_point[2]
             z = self.world_z + pcd_point[0]*math.sin(world_rot_y / 180 * math.pi) + pcd_point[1]*math.cos(world_rot_y/ 180 * math.pi)
-            self.cld.put_point((x, y, z), [0, world_rot_y, 0])
+            self.cloud.put_point((x, y, z), [0, world_rot_y, 0])
 
 
         # Draw minimap
@@ -132,6 +132,8 @@ if __name__ == "__main__":
     def update():
         if held_keys['tab']:
             pass
+        if held_keys['q']:
+            exit()
 
     sun = DirectionalLight()
     sun.look_at(Vec3(1, -1, -1))
