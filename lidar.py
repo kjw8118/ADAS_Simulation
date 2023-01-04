@@ -3,24 +3,36 @@ from PIL import Image
 import numpy as np
 # import cv2
 # import open3d as o3d
-# import pcl
+import pcl
 
 import math
 import csv
 
 from vehicle import Vehicle
 
+class Cloud:
+    points = []
+    def __init__(self):
+        pass
+
+    def put_point(self, position, direction):
+        self.points.append(Entity(model='sphere', scale=0.1, color=color.red, position=position))
+
+    def clear_points(self):
+        for point in self.points:
+            destroy(point)
+        self.points.clear()
 
 class Minimap(Entity):
-    def __init__(self, **kwargs):
-        self.map_size = 512
-        self.boundary = 50
+    def __init__(self, position, **kwargs):
+        self.map_size = 256
+        self.boundary = 25
         super().__init__(
             parent=camera.ui,
             model="quad",
             scale=(0.4, 0.4),
             origin=(-0.5, 0.5),
-            position=window.top_left,
+            position=position,
             texture=Texture(Image.new(mode='RGBA', size=(self.map_size, self.map_size), color=(255, 255, 255, 255)))
         )
 
@@ -37,7 +49,6 @@ class Minimap(Entity):
                 self.texture.set_pixel(int(x + w / 2), int(y + h / 2), color.black)
         self.texture.apply()
 
-
 class LiDAR(Entity):
     tof = {}
     img = None
@@ -46,23 +57,25 @@ class LiDAR(Entity):
     resolution = 2
     # pc = pcl.PointCloud()
     points = []
-
+    cld = Cloud()
+    #cntr = Entity(model='sphere', scale=0.1, color=color.red)
     def __init__(self, **kwargs):
         super().__init__(model='cube', origin_y=-0.5, color=color.light_gray, **kwargs)
 
-        self.minimap = Minimap()
+        self.minimap = Minimap(position=window.top_left)
+        self.minimap2 = Minimap(position=window.top_right)
 
     def update(self):
         pcd_points = []
-
+        world_rot_y = self.world_rotation_y
         # for theta in np.arange(-15, 15, 2):
         if True:
             theta = 0
             for phi in np.arange(0, 360, 0.4):
 
-                direction = Vec3(math.cos((phi + self.world_rotation_y) / 180 * math.pi),
+                direction = Vec3(math.cos((phi + world_rot_y) / 180 * math.pi),
                                  math.sin(theta / 180 * math.pi),
-                                 math.sin((phi + self.world_rotation_y) / 180 * math.pi))
+                                 math.sin((phi + world_rot_y) / 180 * math.pi))
                 hit = raycast(self.world_position, direction, ignore=(self, self.parent), distance=50, debug=False)
 
                 if hit.hit:
@@ -70,11 +83,24 @@ class LiDAR(Entity):
                     y = hit.distance * math.sin(phi / 180 * math.pi)
                     z = hit.distance * math.sin(theta / 180 * math.pi)
                     pcd_points.append([x, y, z])
-                    # self.pc.from_array(np.array(pcd_points, dtype=np.float32))
 
         self.points = pcd_points
+        pcd = pcl.PointCloud(pcd_points)
+        vox = pcd.make_voxel_grid_filter()
+        leaf_size = 2
+        vox.set_leaf_size(leaf_size, leaf_size, leaf_size)
+        cloud = vox.filter()
+        self.cld.clear_points()
+        for pcd_point in cloud.to_array():
+            x = self.world_x + pcd_point[0]*math.cos(world_rot_y / 180 * math.pi) - pcd_point[1]*math.sin(world_rot_y/ 180 * math.pi)
+            y = self.world_y
+            z = self.world_z + pcd_point[0]*math.sin(world_rot_y / 180 * math.pi) + pcd_point[1]*math.cos(world_rot_y/ 180 * math.pi)
+            self.cld.put_point((x, y, z), [0, world_rot_y, 0])
+
 
         # Draw minimap
+        self.minimap2.clear_minimap()
+        self.minimap2.draw_pcd(cloud.to_array())
         self.minimap.clear_minimap()
         self.minimap.draw_pcd(self.points)
 
@@ -84,9 +110,9 @@ if __name__ == "__main__":
     from ursina.shaders import lit_with_shadows_shader
     from ursina.prefabs.first_person_controller import FirstPersonController
 
-    app = Ursina()
+    app = Ursina(position=(2000, 500))
 
-    # window.size = (800, 600)
+    window.size = (800, 600)
 
     random.seed(0)
     Entity.default_shader = lit_with_shadows_shader
