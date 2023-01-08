@@ -15,15 +15,27 @@ class VehicleModel:
         self.outline = {}
         self.update_outline()
 
+        self.is_first = True
+        self.last_value = 0
+        self.num_phi = rotation/180*math.pi
+
     def update_position(self, movement, steering):
         if steering == 0:
             self.position += self.rotation_transformation(self.rotation, [0, movement])
+            current_value = 0
         else:
             corner_radius = self.wheelbase / steering
             corner_angle = movement / corner_radius
             self.rotation += corner_angle
             local_increament = self.rotation_transformation(corner_angle, [-corner_radius, 0]) + np.array([[corner_radius], [0]])
             self.position += self.rotation_transformation(self.rotation,local_increament.reshape(1,2).tolist()[0])
+            current_value = steering*movement/(2*self.wheelbase)
+        if self.is_first:
+            self.last_value = current_value
+            self.is_first = False
+        self.num_phi += current_value + self.last_value
+        self.last_value = current_value
+        print(self.num_phi, self.rotation,";")
         self.update_outline()
 
     def update_outline(self):
