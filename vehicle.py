@@ -37,6 +37,12 @@ class Wheel:
                                                     self.dynamics.outline['RR'][1])
         self.rear_right_wheel.rotation_y = -90 + self.dynamics.get_rotation()
 
+    def set_visible(self, bool):
+        self.left_wheel.visible = bool
+        self.right_wheel.visible = bool
+        self.rear_left_wheel.visible = bool
+        self.rear_right_wheel.visible = bool
+
 class VehicleDynamics:
 
     def __init__(self, position=np.array([[0],[0]]), rotation=0, wheelbase=4, track=1.8):
@@ -102,9 +108,11 @@ class Vehicle(Entity):
         self.dynamics = VehicleDynamics(position=np.array([[self.world_position.x], [self.world_position.z]]),
                                              rotation=self.rotation_y)
         self.wheel = Wheel(self.dynamics)
-
+        self.t0 = time.time()
     def update(self):
-        self.update_dynamics(0, 0)
+        t = time.time() - self.t0
+        self.update_dynamics(0.2, 15*math.sin(t*2))
+
     def update_dynamics(self, aps, steering):
         self.dynamics.update_position(aps, steering)
         position = self.dynamics.get_position()
