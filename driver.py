@@ -15,7 +15,7 @@ class Driver(Vehicle):
 
 
         self.is_ortho = False
-        self.is_first = True
+        self.is_first = False
 
         camera.rotation_x = 12
         self.set_camera_ortho(False)
@@ -90,8 +90,8 @@ if __name__=="__main__":
     random.seed(0)
     Entity.default_shader = lit_with_shadows_shader
 
-    ground = Entity(model='plane', collider='box', scale=1024, texture='grass', texture_scale=(24, 24), name='ground')
-    road = Road()
+    ground = Entity(model='plane', collider='box', scale=1024, texture='grass', texture_scale=(64, 64), name='ground')
+    road = Road(number_of_lane=3, is_oneway=False)
 
     target = Vehicle(z=-40, x=10)
 
