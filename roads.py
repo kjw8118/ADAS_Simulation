@@ -3,6 +3,48 @@ from ursina.duplicate import duplicate
 from ursina.ursinamath import sample_gradient
 import numpy as np
 
+class PathGenerator:
+
+    def __init__(self, initial_position=Vec3(0, 0.1, 0), initial_direction=Vec3(0, 0, 1), resolution=36):
+        self.resolution = resolution
+        self.unit_length = math.pi/self.resolution
+        self.current_position = initial_position
+        self.current_direction = initial_direction
+        self.path = []
+        self.path.append(self.current_position*1)
+        self.path_length_list = []
+        self.path_curvature_list = []
+    def push_straight_path(self, path_length):
+        for path_current in np.arange(0, path_length, self.unit_length):
+            self.current_position += self.unit_length * self.current_direction
+            self.path.append(self.current_position*1)
+
+
+    def push_curve_path(self, path_length, path_curvature):
+        for path_current in np.arange(0, path_length, self.unit_length):
+            self.current_position += self.unit_length * self.current_direction
+            self.path.append(self.current_position*1)
+            current_direction_2d = ursinamath.rotate_point_2d(self.current_direction.xz, Vec3(0, 0, 0), self.unit_length * path_curvature*180/math.pi)
+            self.current_direction = Vec3(current_direction_2d[0], 0, current_direction_2d[1])
+
+    def push_angle_path(self, path_length, path_angle):
+        step_angle = self.unit_length * path_angle / path_length * 180 / math.pi
+        for path_current in np.arange(0, path_length, self.unit_length):
+            self.current_position += self.unit_length * self.current_direction
+            self.path.append(self.current_position*1)
+            current_direction_2d = ursinamath.rotate_point_2d(self.current_direction.xz, Vec3(0, 0, 0), step_angle)
+            self.current_direction = Vec3(current_direction_2d[0], 0, current_direction_2d[1])
+
+    def export_path(self):
+        return self.path.copy()
+
+    #def check_current_path(self):
+    #    print([[self.path_length[i], self.path_curvature[i]] for i in range(len(self.path_length))])
+
+
+
+
+
 class LaneModel(Mesh):
     def __init__(self, lane_position, lane_width, base_shape=Plane, origin=(0,0), path=((0,0,0),(0,1,0)), is_center=False, thicknesses=((1,0.01),), color_gradient=[color.white], look_at=True, cap_ends=False, mode='line', **kwargs):
         if callable(base_shape):
@@ -12,6 +54,7 @@ class LaneModel(Mesh):
         self.base_shape = base_shape
         self.origin = origin
         self.path = path
+        self.path_resolution = 36
         self.is_center = is_center
         self.thicknesses = thicknesses
         self.look_at = look_at
@@ -44,7 +87,7 @@ class LaneModel(Mesh):
         itr = 0
         for i in range(1, len(self.path)):
             itr += 1
-            if not self.is_center and itr%8 in [n for n in range(int(8/2))]:
+            if not self.is_center and itr%(self.path_resolution) in [n for n in range(int(self.path_resolution/2))]:
                 continue
             b.position = self.path[i-1]
             if self.look_at:
@@ -92,14 +135,12 @@ class LaneModel(Mesh):
                     self.colors.append(from_color)
                     self.colors.append(to_color)
 
-
-
-
         self.vertices = verts
         self.uvs = [(v[0], v[1]) for v in verts]
         super().generate()
         destroy(b)
         destroy(e)
+
 class RoadModel(Mesh):
     def __init__(self, road_width=3.5, base_shape=Plane, origin=(0,0), path=((0,0,0),(0,1,0)), thicknesses=((1,0.01),), color_gradient=None, look_at=True, cap_ends=False, mode='line', **kwargs):
         if callable(base_shape):
@@ -187,42 +228,43 @@ class RoadModel(Mesh):
         destroy(e)
 
 class Road:
-    def __init__(self, number_of_lane=1, is_oneway=True):
-        path = [Vec3(2*math.cos(theta/8), 0.1, theta * 2) for theta in np.arange(0, 32*math.pi, math.pi / 18)]
+    def __init__(self, main_path=[Vec3(2*math.cos(theta), 0.1, theta * 8) for theta in np.arange(0, 2*math.pi, math.pi / 64)], number_of_lane=1, is_oneway=True):
+        self.main_path = main_path
         #asphalt = load_texture("asphalt", "./assets/asphalt_texture.jpg")
         road_width = 3.5
         lane_width = 0.15
-        self.model = []
-        self.llane = []
-        self.rlane = []
+        self.road = {}
+        self.llane = {}
+        self.rlane = {}
+
         for i in range(number_of_lane):
 
-            path_road = [(path[j+1]-path[j]).cross(Vec3(0,-1,0)).normalized()*road_width*(0.5+i)+path[j] for j in range(len(path)-1)]
-            self.model.append(Entity(model=RoadModel(road_width=road_width, path=path_road, color_gradient=[color.light_gray])))#, texture="assets/asphalt_texture3.jpg")
+            path_road = [(self.main_path[j+1]-self.main_path[j]).cross(Vec3(0,-1,0)).normalized()*road_width*(0.5+i)+self.main_path[j] for j in range(len(self.main_path)-1)]
+            self.road[str(i+1)] = Entity(model=RoadModel(road_width=road_width, path=path_road, color_gradient=[color.light_gray]))
 
             if i == 0:
-                self.llane.append(Entity(model=LaneModel(lane_position=-road_width / 2 + lane_width / 2, is_center=True, lane_width=lane_width, path=path_road)))
+                self.llane[str(i+1)] = Entity(model=LaneModel(lane_position=-road_width / 2 + lane_width / 2, is_center=True, lane_width=lane_width, path=path_road))
             else:
-                self.llane.append(Entity(model=LaneModel(lane_position=-road_width / 2 + lane_width / 2, lane_width=lane_width, path=path_road)))
-            self.rlane.append(Entity(model=LaneModel(lane_position=road_width / 2 - lane_width / 2, lane_width=lane_width, path=path_road)))
+                self.llane[str(i+1)] = Entity(model=LaneModel(lane_position=-road_width / 2 + lane_width / 2, lane_width=lane_width, path=path_road))
+            self.rlane[str(i+1)] = Entity(model=LaneModel(lane_position=road_width / 2 - lane_width / 2, lane_width=lane_width, path=path_road))
 
             if not is_oneway:
-                path_road = [(path[j + 1] - path[j]).cross(Vec3(0, 1, 0)).normalized() * road_width * (0.5 + i) + path[j] for j
-                             in range(len(path) - 1)]
-                self.model.append(Entity(model=RoadModel(road_width=road_width, path=path_road, color_gradient=[
-                    color.light_gray])))  # , texture="assets/asphalt_texture3.jpg")
+                path_road = [(self.main_path[j + 1] - self.main_path[j]).cross(Vec3(0, 1, 0)).normalized() * road_width * (0.5 + i) + self.main_path[j] for j
+                             in range(len(self.main_path) - 1)]
+                self.road[str(-(i+1))] = Entity(model=RoadModel(road_width=road_width, path=path_road, color_gradient=[
+                    color.light_gray]))
 
                 if i == 0:
-                    self.rlane.append(Entity(
+                    self.rlane[str(-(i+1))] = Entity(
                         model=LaneModel(lane_position=road_width / 2 - lane_width / 2,  is_center=True, lane_width=lane_width,
-                                        path=path_road)))
+                                        path=path_road))
                 else:
-                    self.rlane.append(Entity(
+                    self.rlane[str(-(i+1))] = Entity(
                         model=LaneModel(lane_position=road_width / 2 - lane_width / 2, lane_width=lane_width,
-                                        path=path_road)))
-                self.llane.append(Entity(
+                                        path=path_road))
+                self.llane[str(-(i+1))] = Entity(
                     model=LaneModel(lane_position=-road_width / 2 + lane_width / 2, lane_width=lane_width,
-                                    path=path_road)))
+                                    path=path_road))
 
 
 
@@ -245,7 +287,16 @@ if __name__=="__main__":
 
     player = FirstPersonController(y=1.5, origin_y=0)
 
-    road = Road(number_of_lane=3, is_oneway=False)
+    path_generator = PathGenerator(resolution=36)
+    path_generator.push_straight_path(10)
+    path_generator.push_angle_path(30, math.pi/6)
+    path_generator.push_straight_path(5)
+    path_generator.push_curve_path(30, -1/50)
+    path_generator.push_angle_path(20, math.pi / 3)
+    path = path_generator.export_path()
+
+
+    road = Road(main_path=path, number_of_lane=3, is_oneway=False)
 
     #p = Entity(model='plane',scale_z=5, origin_y=-1.5)#, texture="assets/asphalt_texture3.jpg")
     #p.texture_scale = (5,5)
