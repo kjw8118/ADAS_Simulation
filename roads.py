@@ -8,7 +8,7 @@ class PathGenerator:
     def __init__(self, initial_position=Vec3(0, 0.1, 0), initial_direction=Vec3(0, 0, 1), resolution=36, initial_slope=0):
         self.resolution = resolution
         self.unit_length = math.pi/self.resolution
-        self.current_position = initial_position
+        self.current_position = initial_position + Vec3(0, 0.1, 0)
         self.current_direction = initial_direction
         self.current_slope = 0
         self.target_slope = initial_slope
@@ -16,6 +16,7 @@ class PathGenerator:
         self.path.append(self.current_position*1)
         self.path_length_list = []
         self.path_curvature_list = []
+        self.slope_curvature = 0.05
 
     def push_straight_path(self, path_length):
         for path_current in np.arange(0, path_length, self.unit_length):
@@ -23,7 +24,7 @@ class PathGenerator:
             self.path.append(self.current_position*1)
             self.current_direction.y = ursinamath.distance_xz(Vec3(0,0,0), self.current_direction)*math.tan(self.current_slope*math.pi/180)
             self.current_direction = self.current_direction/ursinamath.distance(Vec3(0,0,0), self.current_direction)
-            self.current_slope += (self.target_slope - self.current_slope)*0.1
+            self.current_slope += (self.target_slope - self.current_slope) * self.slope_curvature
 
 
     def push_curve_path(self, path_length, path_curvature):
@@ -35,7 +36,7 @@ class PathGenerator:
                 self.current_slope * math.pi / 180)
             self.current_direction = Vec3(current_direction_2d_xz[0], current_direction_2d_y, current_direction_2d_xz[1])
             self.current_direction = self.current_direction/ursinamath.distance(Vec3(0,0,0), self.current_direction)
-            self.current_slope += (self.target_slope - self.current_slope) * 0.1
+            self.current_slope += (self.target_slope - self.current_slope) * self.slope_curvature
 
 
     def push_angle_path(self, path_length, path_angle):
@@ -50,7 +51,7 @@ class PathGenerator:
             self.current_direction = Vec3(current_direction_2d_xz[0], current_direction_2d_y,
                                           current_direction_2d_xz[1])
             self.current_direction = self.current_direction / ursinamath.distance(Vec3(0, 0, 0), self.current_direction)
-            self.current_slope += (self.target_slope - self.current_slope) * 0.1
+            self.current_slope += (self.target_slope - self.current_slope) * self.slope_curvature
 
     def set_slope(self, slope):
         self.target_slope = slope
@@ -77,7 +78,7 @@ class LaneModel(Mesh):
         self.thicknesses = ((1,0.01),)
         self.look_at = True
         self.cap_ends = False
-        self.mode = 'ngon'
+        #self.mode = 'ngon'
         if self.is_center:
             self.color_gradient = [color.yellow]
         else:
@@ -309,11 +310,11 @@ if __name__=="__main__":
 
     path_generator = PathGenerator(resolution=32)
     path_generator.push_straight_path(5)
-    path_generator.set_slope(10)
+    path_generator.set_slope(15)
     path_generator.push_straight_path(10)
     path_generator.set_slope(0)
     path_generator.push_angle_path(30, math.pi/6)
-    path_generator.set_slope(-10)
+    path_generator.set_slope(-15)
     path_generator.push_straight_path(5)
     path_generator.set_slope(0)
     path_generator.push_curve_path(30, -1/50)
